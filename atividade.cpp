@@ -1,208 +1,150 @@
 #include <iostream>
-#include <string.h>
-#include <Windows.h>
-#include <locale>
+#include <fstream>
+#include <string>
+#include <windows.h>
+#include <shlobj.h>
+#include <direct.h>
+#include <locale.h>
+
+using namespace std;
 
 struct Paciente {
     char nome[50];
-    char cpf[20];
-    char dataNascimento[15];
-    char diagnostico[100];
-    char status; // ' ' para ativo, '*' para excluído
+    char telefone[20];
+    char email[50];
+    char status;
 };
+string getUserFolderPath() {
+    wchar_t path[MAX_PATH];
+    if (SHGetFolderPathW(NULL, CSIDL_MYDOCUMENTS, NULL, 0, path) == S_OK) {
+        char caminho[MAX_PATH];
+        size_t convertedChars = 0;
+        wcstombs_s(&convertedChars, caminho, MAX_PATH, path, _TRUNCATE);
 
-int tamanho(FILE *arq);
-void cadastrar(FILE *arq);
-void consultar(FILE *arq);
-void gerarRelatorio(FILE *arq);
-void excluir(FILE *arq);
-
-int main()
-{
-    int op;
-    FILE *arq;
-
-    // Abre o arquivo binário, se não existir cria um novo
-    if ((arq = fopen("pacientes.dat", "rb+")) == NULL)
-    {
-        if ((arq = fopen("pacientes.dat", "wb+")) == NULL)
-        {
-            printf("Falha ao abrir o arquivo!\n");
-            system("pause");
-            return 0;
-        }
+        return string(caminho);
     }
-
-    do
-    {
-        system("CLS");
-        printf("\n======= HOSPITAL ======= \n");
-        printf("1.Cadastrar Paciente\n");
-        printf("2.Consultar Paciente\n");
-        printf("3.Gerar Relatório\n");
-        printf("4.Excluir Paciente\n");
-        printf("5.Sair\n");
-        printf("===========Pacientes Cadastrados:%d===========\n", tamanho(arq));
-        printf("Opcao: ");
-        scanf("%d", &op);
-        switch (op)
-        {
-        case 1:
-            cadastrar(arq);
-            break;
-        case 2:
-            consultar(arq);
-            break;
-        case 3:
-            gerarRelatorio(arq);
-            break;
-        case 4:
-            excluir(arq);
-            break;
-        case 5:
-            fclose(arq);
-            break;
-        default:
-            printf("Opcao invalida!\n");
-            break;
-        }
-    } while (op != 5);
-
-    return 0;
+    return "";
 }
 
-void cadastrar(FILE *arq)
-{
-    Paciente paciente;
+string criarPastaRelatorios() {
+    string pastaBase = getUserFolderPath() + "\\RelatoriosPaciente\\";
+    if (_mkdir(pastaBase.c_str()) == 0 || errno == EEXIST) {
+        return pastaBase;
+    }
+    else {
+        return "";
+    }
+}
+void cadastrar(Paciente pacientes[], int& numPacientes) {
+    Paciente novoPaciente;
     char confirma;
-    paciente.status = ' ';
-    fflush(stdin);
 
-    printf("Cadastrando novo paciente:\n");
-    printf("Nome.............: ");
-    gets(paciente.nome);
-    printf("CPF..............: ");
-    gets(paciente.cpf);
-    printf("Data Nascimento..: ");
-    gets(paciente.dataNascimento);
-    printf("Diagnóstico......: ");
-    gets(paciente.diagnostico);
-    printf("\nConfirma <s/n>: ");
-    fflush(stdin);
-    scanf("%c", &confirma);
+    cout << "Cadastrando novo paciente:" << endl;
+    cout << "Nome: ";
+    cin.ignore();
+    cin.getline(novoPaciente.nome, sizeof(novoPaciente.nome));
+    cout << "Telefone: ";
+    cin.getline(novoPaciente.telefone, sizeof(novoPaciente.telefone));
+    cout << "E-mail: ";
+    cin.getline(novoPaciente.email, sizeof(novoPaciente.email));
 
-    if (toupper(confirma) == 'S')
-    {
-        printf("\nGravando...\n\n");
-        fseek(arq, 0, SEEK_END);
-        fwrite(&paciente, sizeof(Paciente), 1, arq);
+    cout << "Confirma cadastro? <s/n>: ";
+    cin >> confirma;
+
+    if (toupper(confirma) == 'S') {
+        novoPaciente.status = 'A';
+        pacientes[numPacientes] = novoPaciente;
+        numPacientes++;
+        cout << "Paciente cadastrado com sucesso!" << endl;
     }
-    system("pause");
+    else {
+        cout << "Cadastro cancelado." << endl;
+    }
 }
 
-void consultar(FILE *arq)
-{
-    Paciente paciente;
-    int nr;
-    printf("\nConsulta pelo codigo\n");
-    printf("\nInforme o Codigo: ");
-    scanf("%d", &nr);
-    if ((nr <= tamanho(arq)) && (nr > 0))
-    {
-        fseek(arq, (nr - 1) * sizeof(Paciente), SEEK_SET);
-        fread(&paciente, sizeof(Paciente), 1, arq);
-        if (paciente.status == ' ')
-        {
-            printf("\nNome........: %s", paciente.nome);
-            printf("\nCPF.........: %s", paciente.cpf);
-            printf("\nData Nascimento: %s", paciente.dataNascimento);
-            printf("\nDiagnóstico..: %s\n", paciente.diagnostico);
-        }
-        else
-        {
-            printf("\nPaciente excluído!\n");
-        }
+void consultarPaciente(Paciente pacientes[], int numPacientes) {
+    int codigo;
+    cout << "Digite o código do paciente (1 a " << numPacientes << "): ";
+    cin >> codigo;
+    if (codigo > 0 && codigo <= numPacientes) {
+        Paciente p = pacientes[codigo - 1];
+        cout << "Paciente encontrado:" << endl;
+        cout << "Nome: " << p.nome << endl;
+        cout << "Telefone: " << p.telefone << endl;
+        cout << "E-mail: " << p.email << endl;
+        cout << "Status: " << (p.status == 'A' ? "Ativo" : "Inativo") << endl;
     }
-    else
-    {
-        printf("\nNúmero de registro inválido!\n");
+    else {
+        cout << "Código inválido!" << endl;
     }
-    system("pause");
 }
 
-void gerarRelatorio(FILE *arq)
-{
-    char nomearq[20];
-    printf("Nome do arquivo texto: ");
-    scanf("%s", nomearq);
-    strcat(nomearq, ".txt");
-    FILE *arqtxt = fopen(nomearq, "w");
-    if (!arqtxt)
-    {
-        printf("Não foi possível criar esse arquivo!\n");
-        system("pause");
+void gerarRelatorio(Paciente pacientes[], int numPacientes) {
+    string nomeArquivo;
+    cout << "Digite o nome do arquivo (sem a extensão): ";
+    cin >> nomeArquivo;
+    string pastaRelatorios = criarPastaRelatorios();
+    if (pastaRelatorios.empty()) {
+        cout << "Erro ao criar a pasta para os relatórios!" << endl;
+        return;
+    }
+    string caminhoArquivo = pastaRelatorios + nomeArquivo + ".txt";
+    ofstream arquivo(caminhoArquivo);
+
+    if (!arquivo) {
+        cout << "Erro ao criar o arquivo! Verifique as permissões de escrita." << endl;
         return;
     }
 
-    fprintf(arqtxt, "Nome                 CPF              Data Nascimento    Diagnóstico        Status\n");
-    fprintf(arqtxt, "==========================================================================\n");
+    arquivo << "Nome                Telefone       E-mail                Status\n";
+    arquivo << "==============================================================\n";
 
-    int nr;
-    Paciente paciente;
-    for (nr = 0; nr < tamanho(arq); nr++)
-    {
-        fseek(arq, nr * sizeof(Paciente), SEEK_SET);
-        fread(&paciente, sizeof(Paciente), 1, arq);
-        fprintf(arqtxt, "%-20s%-18s%-20s%-20s- %c\n", paciente.nome, paciente.cpf, paciente.dataNascimento, paciente.diagnostico, paciente.status);
+    for (int i = 0; i < numPacientes; i++) {
+        arquivo << pacientes[i].nome << "   "
+            << pacientes[i].telefone << "   "
+            << pacientes[i].email << "   "
+            << pacientes[i].status << endl;
     }
-    fprintf(arqtxt, "==========================================================================\n");
-    fclose(arqtxt);
+
+    arquivo.close();
+    cout << "Relatório gerado com sucesso em: " << caminhoArquivo << endl;
 }
 
-void excluir(FILE *arq)
-{
-    Paciente paciente;
-    char confirma;
-    int nr;
+int main() {
+    setlocale(LC_ALL, "pt_BR.UTF-8");
+    Paciente pacientes[1000];  
+    int numPacientes = 0;      
+    int opcao;
 
-    printf("\nInforme o código do paciente para excluir\n");
-    scanf("%d", &nr);
-    if ((nr <= tamanho(arq)) && (nr > 0))
-    {
-        fseek(arq, (nr - 1) * sizeof(Paciente), SEEK_SET);
-        fread(&paciente, sizeof(Paciente), 1, arq);
-        if (paciente.status == ' ')
-        {
-            printf("\nNome........: %s", paciente.nome);
-            printf("\nCPF.........: %s", paciente.cpf);
-            printf("\nData Nascimento: %s", paciente.dataNascimento);
-            printf("\nDiagnóstico..: %s\n", paciente.diagnostico);
-            printf("\nConfirma a exclusao: <s/n>\n");
-            getchar();
-            scanf("%c", &confirma);
+    do {
+        system("CLS");
+        cout << "\n======= SISTEMA DE PACIENTES ======= \n";
+        cout << "1. Cadastrar Paciente\n";
+        cout << "2. Consultar Paciente pelo Código\n";
+        cout << "3. Gerar Relatório\n";
+        cout << "4. Sair\n";
+        cout << "Escolha uma opção: ";
+        cin >> opcao;
 
-            if (toupper(confirma) == 'S')
-            {
-                printf("\nExcluindo...\n\n");
-                fseek(arq, (nr - 1) * sizeof(Paciente), SEEK_SET);
-                paciente.status = '*';
-                fwrite(&paciente, sizeof(Paciente), 1, arq);
-            }
+        switch (opcao) {
+        case 1:
+            cadastrar(pacientes, numPacientes);
+            break;
+        case 2:
+            consultarPaciente(pacientes, numPacientes);
+            break;
+        case 3:
+            gerarRelatorio(pacientes, numPacientes);
+            break;
+        case 4:
+            cout << "Saindo do programa." << endl;
+            break;
+        default:
+            cout << "Opção inválida! Tente novamente." << endl;
         }
-        else
-        {
-            printf("Paciente inexistente!\n");
-        }
-    }
-    else
-    {
-        printf("\nNúmero de registro inválido!\n");
-    }
-    system("pause");
-}
+        system("pause");
 
-int tamanho(FILE *arq)
-{
-    fseek(arq, 0, SEEK_END);
-    return ftell(arq) / sizeof(Paciente);
+    } while (opcao != 4);
+
+    return 0;
 }
